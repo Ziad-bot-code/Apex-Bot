@@ -24,7 +24,7 @@ export const botConfig = {
     activities: [
       {
         name: "EuropeMC Giveaways Hub", // required by Discord API, not shown in the client
-        state: "Bot Made By _ziad1_ ",     // this is what people actually see
+        state: "Bot Made By YOUSEFGG ",     // this is what people actually see
         type: 4,               // Custom
       },
     ],
