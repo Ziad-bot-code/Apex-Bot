@@ -8,7 +8,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 export default {
     data: new SlashCommandBuilder()
-    .setName("purge")
+    .setName("clear")
     .setDescription("Delete a specific amount of messages")
     .addIntegerOption((option) =>
       option
