@@ -24,7 +24,7 @@ export const botConfig = {
     activities: [
       {
         name: "EuropeMC Giveaways Hub", // required by Discord API, not shown in the client
-        state: "stalking",     // this is what people actually see
+        state: "By _ziad1_",     // this is what people actually see
         type: 4,               // Custom
       },
     ],
