@@ -25,9 +25,7 @@ export default {
         .addStringOption((option) =>
             option
                 .setName("duration")
-                .setDescription(
-                    "How long the giveaway should last (e.g., 1h, 30m, 5d).",
-                )
+                .setDescription("How long the giveaway should last (e.g., 1h, 30m, 5d).")
                 .setRequired(true),
         )
         .addIntegerOption((option) =>
@@ -50,11 +48,9 @@ export default {
                 .setDescription("The channel to send the giveaway to (defaults to current channel).")
                 .addChannelTypes(ChannelType.GuildText)
                 .setRequired(false),
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+        ),
 
     async execute(interaction) {
-        // Defer up front: sending the giveaway message + DB write can exceed the 3s window
         await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
 
         if (!interaction.inGuild()) {
@@ -66,11 +62,16 @@ export default {
             );
         }
 
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+        // Check permissions: Manage Server OR Role in allowedRoles (botConfig)
+        const allowedRoles = botConfig.giveaways?.allowedRoles || [];
+        const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
+        const hasAllowedRole = interaction.member.roles.cache.some((role) => allowedRoles.includes(role.id));
+
+        if (!hasManageGuild && !hasAllowedRole) {
             throw new TitanBotError(
-                'User lacks ManageGuild permission',
+                'User lacks permission to host giveaway',
                 ErrorTypes.PERMISSION,
-                "You need the 'Manage Server' permission to start a giveaway.",
+                "You do not have permission to start a giveaway.",
                 { userId: interaction.user.id, guildId: interaction.guildId }
             );
         }
