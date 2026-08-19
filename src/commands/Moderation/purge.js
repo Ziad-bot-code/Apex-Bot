@@ -36,17 +36,20 @@ export default {
         try {
             const deleted = await interaction.channel.bulkDelete(amount, true);
 
-            // Log event with correct moderator data
-            await logEvent(client, interaction.guildId, 'MESSAGES_PURGED', {
-                moderator: interaction.user,
-                user: interaction.user,
-                target: interaction.user,
-                channel: interaction.channel,
-                channelId: interaction.channel.id,
-                messageCount: deleted.size,
-                requestedAmount: amount,
-                reason: `Deleted ${deleted.size} messages`
-            });
+            // ارسال اللوج بنفس الهيكل الاصلي مع تحديد اليوزر المسئول
+            try {
+                await logEvent(interaction.guild, 'MESSAGES_PURGED', {
+                    channel: interaction.channel,
+                    channelId: interaction.channel.id,
+                    user: interaction.user,
+                    executor: interaction.user,
+                    messageCount: deleted.size,
+                    requestedAmount: amount,
+                    reason: `Deleted ${deleted.size} messages`
+                });
+            } catch (logErr) {
+                logger.error('Logging failed:', logErr);
+            }
 
             await InteractionHelper.safeReply(interaction, {
                 embeds: [
