@@ -1,8 +1,11 @@
 import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
-import { successEmbed } from '../../utils/embeds.js';
-import { logger } from '../../utils/logger.js';
+import { createEmbed, successEmbed } from '../../utils/embeds.js';
 import { logEvent } from '../../utils/moderation.js';
+import { logger } from '../../utils/logger.js';
+import { getColor } from '../../config/bot.js';
+
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -36,19 +39,19 @@ export default {
         try {
             const deleted = await interaction.channel.bulkDelete(amount, true);
 
-            // ارسال اللوج بنفس الهيكل الاصلي مع تحديد اليوزر المسئول
+            // ارسال اسم وصورة المستخدم الذي نفذ الأمر بدلاً من الروم
             try {
-                await logEvent(interaction.guild, 'MESSAGES_PURGED', {
+                await logEvent(interaction, 'MESSAGES_PURGED', {
                     channel: interaction.channel,
-                    channelId: interaction.channel.id,
                     user: interaction.user,
-                    executor: interaction.user,
+                    target: interaction.user,
+                    moderator: interaction.user,
                     messageCount: deleted.size,
                     requestedAmount: amount,
                     reason: `Deleted ${deleted.size} messages`
                 });
             } catch (logErr) {
-                logger.error('Logging failed:', logErr);
+                logger.error('Purge log error:', logErr);
             }
 
             await InteractionHelper.safeReply(interaction, {
