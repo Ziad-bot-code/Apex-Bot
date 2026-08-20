@@ -6,7 +6,8 @@ import { getGuildGiveaways, saveGiveaway } from '../../utils/giveaways.js';
 import { 
     endGiveaway as endGiveawayService,
     createGiveawayEmbed, 
-    createGiveawayButtons 
+    createGiveawayButtons,
+    openWinnerTickets
 } from '../../services/giveawayService.js';
 import { logEvent, EVENT_TYPES } from '../../services/loggingService.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -169,6 +170,8 @@ export default {
             } catch (logError) {
                 logger.debug('Error logging giveaway winner event:', logError);
             }
+
+            await openWinnerTickets(interaction.client, interaction.guild, updatedGiveaway, winners);
         } else {
             await channel.send({
                 content: `The giveaway for **${updatedGiveaway.prize}** has ended with no valid entries.`,
