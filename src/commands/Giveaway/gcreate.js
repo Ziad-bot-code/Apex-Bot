@@ -12,6 +12,7 @@ import {
 } from '../../services/giveawayService.js';
 import { logEvent, EVENT_TYPES } from '../../services/loggingService.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { getGuildConfig } from '../../services/config/guildConfig.js';
 
 import { botConfig } from '../../config/bot.js';
 
@@ -116,10 +117,15 @@ export default {
         const embed = createGiveawayEmbed(initialGiveawayData, "active");
         const row = createGiveawayButtons(false);
 
+        const guildConfig = await getGuildConfig(interaction.client, interaction.guildId).catch(() => null);
+        const pingRoleId = guildConfig?.giveawayPingRoleId || null;
+        const pingContent = pingRoleId ? `<@&${pingRoleId}> ` : "";
+
         const giveawayMessage = await targetChannel.send({
-            content: "🎉 **NEW GIVEAWAY** 🎉",
+            content: `${pingContent}🎉 **NEW GIVEAWAY** 🎉`,
             embeds: [embed],
             components: [row],
+            allowedMentions: { roles: pingRoleId ? [pingRoleId] : [] },
         });
 
         initialGiveawayData.messageId = giveawayMessage.id;
