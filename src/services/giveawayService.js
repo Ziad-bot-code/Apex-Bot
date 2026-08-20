@@ -4,12 +4,63 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlag
 import { logger } from '../utils/logger.js';
 import { TitanBotError, ErrorTypes } from '../utils/errorHandler.js';
 import { getColor, botConfig } from '../config/bot.js';
-import { getEndedGiveaways, markGiveawayEnded } from '../utils/database.js';
+import { getEndedGiveaways, markGiveawayEnded, getTicketData, saveTicketData } from '../utils/database.js';
 import { checkRateLimit, getRateLimitStatus } from '../utils/rateLimiter.js';
 import { logEvent, EVENT_TYPES } from './loggingService.js';
+import { createTicket } from './ticket.js';
 
 const GIVEAWAY_CONFIG = botConfig.giveaways || {};
 const GIVEAWAY_INTERACTION_COOLDOWN = 1000;
+const WINNER_TICKET_AUTO_CLOSE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
+ * Opens one prize-claim ticket per winner and schedules it to auto-close in 24h.
+ * Failures for individual winners are logged and skipped so one bad fetch
+ * doesn't stop the rest of the winners from getting their ticket.
+ */
+export async function openWinnerTickets(client, guild, giveaway, winners) {
+    if (!guild || !Array.isArray(winners) || winners.length === 0) {
+        return [];
+    }
+
+    const opened = [];
+
+    for (const winnerId of winners) {
+        try {
+            const member = await guild.members.fetch(winnerId).catch(() => null);
+            if (!member) {
+                logger.warn(`Could not fetch winner ${winnerId} in guild ${guild.id} to open a ticket`);
+                continue;
+            }
+
+            const { channel, ticketData } = await createTicket(
+                guild,
+                member,
+                null,
+                `Prize claim: ${giveaway.prize || 'Giveaway prize'}`,
+                'none',
+            );
+
+            const autoCloseAt = new Date(Date.now() + WINNER_TICKET_AUTO_CLOSE_MS).toISOString();
+            const freshTicketData = (await getTicketData(guild.id, channel.id)) || ticketData;
+            freshTicketData.autoCloseAt = autoCloseAt;
+            freshTicketData.giveawayMessageId = giveaway.messageId;
+            await saveTicketData(guild.id, channel.id, freshTicketData);
+
+            await channel.send({
+                content: `🎉 ${member} Congratulations on winning **${giveaway.prize || 'the giveaway'}**! A member of staff will be with you shortly to sort out your prize. This ticket will automatically close in 24 hours.`,
+            }).catch((sendError) => {
+                logger.warn(`Could not send winner message in ticket ${channel.id}: ${sendError.message}`);
+            });
+
+            opened.push({ winnerId, channelId: channel.id });
+        } catch (error) {
+            logger.error(`Failed to open winner ticket for ${winnerId} in guild ${guild.id}:`, error);
+        }
+    }
+
+    return opened;
+}
 
 function getGiveawayInteractionKey(userId, giveawayId) {
     return `giveaway:${userId}:${giveawayId}`;
@@ -422,6 +473,8 @@ export async function checkGiveaways(client) {
           } catch (error) {
             logger.debug('Error logging giveaway winner:', error);
           }
+
+          await openWinnerTickets(client, guild, giveaway, winners);
         } else {
           await channel.send({ content: `The giveaway for **${giveaway.prize}** has ended with no valid entries.` });
         }
