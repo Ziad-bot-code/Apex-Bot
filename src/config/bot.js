@@ -23,7 +23,7 @@ export const botConfig = {
     // 5 = Competing
     activities: [
       {
-        name: "Echo Bot", // required by Discord API, not shown in the client
+        name: "Apex Bot", // required by Discord API, not shown in the client
         state: "Bot Made By _ziad1_ ",     // this is what people actually see
         type: 4,               // Custom
       },
