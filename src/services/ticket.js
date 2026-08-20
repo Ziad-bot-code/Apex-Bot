@@ -10,7 +10,7 @@ import {
 } from 'discord.js';
 import { buildStandardLogEmbed, formatLogLine } from '../utils/logging/logEmbeds.js';
 import { getGuildConfig } from './config/guildConfig.js';
-import { getTicketData, saveTicketData, deleteTicketData, getOpenTicketCountForUser, incrementTicketCounter } from '../utils/database.js';
+import { getTicketData, saveTicketData, deleteTicketData, getOpenTicketCountForUser, incrementTicketCounter, getTicketsDueForAutoClose } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 import { createEmbed, errorEmbed } from '../utils/embeds.js';
 import { logTicketEvent } from '../utils/ticket/ticketLogging.js';
@@ -956,6 +956,38 @@ export async function unclaimTicket(channel, unclaimer) {
 
 async function getNextTicketNumber(guildId) {
   return await incrementTicketCounter(guildId);
+}
+
+/**
+ * Scans every guild the bot is in for tickets whose autoCloseAt has passed
+ * (e.g. giveaway-winner prize-claim tickets) and closes them automatically.
+ * Intended to be run periodically from a cron job.
+ */
+export async function checkAutoCloseTickets(client) {
+  if (!client?.guilds?.cache) return;
+
+  for (const [guildId, guild] of client.guilds.cache) {
+    try {
+      const dueTickets = await getTicketsDueForAutoClose(guildId);
+
+      for (const ticketData of dueTickets) {
+        try {
+          const channel = await guild.channels.fetch(ticketData.id).catch(() => null);
+          if (!channel) {
+            logger.debug(`Auto-close skipped: channel ${ticketData.id} not found in guild ${guildId}`);
+            continue;
+          }
+
+          await closeTicket(channel, client.user, 'Automatically closed after 24 hours.');
+          logger.info(`Auto-closed ticket ${channel.id} in guild ${guildId} after 24h`);
+        } catch (ticketError) {
+          logger.error(`Failed to auto-close ticket ${ticketData?.id} in guild ${guildId}:`, ticketError);
+        }
+      }
+    } catch (guildError) {
+      logger.error(`Error checking auto-close tickets for guild ${guildId}:`, guildError);
+    }
+  }
 }
 
 export async function updateTicketPriority(channel, priority, updater) {
