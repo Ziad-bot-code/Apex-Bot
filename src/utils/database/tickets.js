@@ -96,7 +96,7 @@ export async function incrementTicketCounter(guildId) {
     return nextCounter.toString().padStart(3, '0');
 }
 
-async function listGuildTickets(guildId) {
+export async function listGuildTickets(guildId) {
     if (!db.initialized) {
         await db.initialize();
     }
@@ -124,6 +124,23 @@ async function listGuildTickets(guildId) {
     }
 
     return tickets;
+}
+
+export async function getTicketsDueForAutoClose(guildId) {
+    try {
+        const tickets = await listGuildTickets(guildId);
+        const now = Date.now();
+
+        return tickets.filter((ticket) => {
+            if (!ticket || ticket.status !== 'open') return false;
+            if (!ticket.autoCloseAt) return false;
+            const autoCloseAt = new Date(ticket.autoCloseAt).getTime();
+            return Number.isFinite(autoCloseAt) && autoCloseAt <= now;
+        });
+    } catch (error) {
+        logger.error(`Error listing tickets due for auto-close in guild ${guildId}:`, error);
+        return [];
+    }
 }
 
 export async function getGuildTicketStats(guildId) {
