@@ -58,6 +58,16 @@ export {
     getTicketCounter,
     incrementTicketCounter,
     getGuildTicketStats,
+    export {
+    getTicketData,
+    getOpenTicketCountForUser,
+    saveTicketData,
+    deleteTicketData,
+    getTicketCounter,
+    incrementTicketCounter,
+    getGuildTicketStats,
+    listGuildTickets,
+    getTicketsDueForAutoClose,
 } from './database/tickets.js';
 
 import { db, getFromDb, setInDb } from './database/wrapper.js';
