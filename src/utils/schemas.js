@@ -65,6 +65,7 @@ const DailyGiveawayConfigSchema = z
     prize: z.string().nullable().optional(),
     durationString: z.string().nullable().optional(),
     winnerCount: z.number().int().min(1).max(20).default(1),
+    pingRoleId: z.string().nullable().optional(),
     lastTriggeredDate: z.string().nullable().optional()
   })
   .optional();
