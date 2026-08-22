@@ -375,6 +375,89 @@ export async function endGiveaway(client, giveaway, guildId, endedBy) {
     }
 }
 
+/**
+ * Checks every guild's dailyGiveaway config once a minute and starts a new
+ * giveaway when the current UTC time matches the configured time and one
+ * hasn't already been started today (UTC date).
+ */
+export async function checkDailyGiveaways(client) {
+  try {
+    const { getGuildConfig } = await import('./config/guildConfig.js');
+    const { setConfigValue } = await import('./config/guildConfig.js');
+    const { saveGiveaway } = await import('../utils/giveaways.js');
+
+    const now = new Date();
+    const currentTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
+    const currentDate = now.toISOString().slice(0, 10);
+
+    for (const [guildId, guild] of client.guilds.cache) {
+      try {
+        const config = await getGuildConfig(client, guildId);
+        const daily = config?.dailyGiveaway;
+
+        if (!daily?.enabled || !daily.time || !daily.channelId) {
+          continue;
+        }
+
+        if (daily.time !== currentTime || daily.lastTriggeredDate === currentDate) {
+          continue;
+        }
+
+        const channel = await guild.channels.fetch(daily.channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+          logger.warn(`Daily giveaway channel ${daily.channelId} not found/text in guild ${guildId}, skipping`);
+          await setConfigValue(client, guildId, 'dailyGiveaway', { ...daily, lastTriggeredDate: currentDate });
+          continue;
+        }
+
+        const durationMs = parseDuration(daily.durationString);
+        const prizeName = validatePrize(daily.prize);
+        validateWinnerCount(daily.winnerCount || 1);
+
+        const endTime = Date.now() + durationMs;
+        const initialGiveawayData = {
+          messageId: 'placeholder',
+          channelId: channel.id,
+          guildId,
+          prize: prizeName,
+          hostId: client.user.id,
+          endTime,
+          endsAt: endTime,
+          winnerCount: daily.winnerCount || 1,
+          participants: [],
+          isEnded: false,
+          ended: false,
+          createdAt: new Date().toISOString(),
+        };
+
+        const embed = createGiveawayEmbed(initialGiveawayData, 'active');
+        const row = createGiveawayButtons(false);
+
+        const pingRoleId = config?.giveawayPingRoleId || null;
+        const pingContent = pingRoleId ? `<@&${pingRoleId}> ` : '';
+
+        const giveawayMessage = await channel.send({
+          content: `${pingContent}🎉 **DAILY GIVEAWAY** 🎉`,
+          embeds: [embed],
+          components: [row],
+          allowedMentions: { roles: pingRoleId ? [pingRoleId] : [] },
+        });
+
+        initialGiveawayData.messageId = giveawayMessage.id;
+        await saveGiveaway(client, guildId, initialGiveawayData);
+
+        await setConfigValue(client, guildId, 'dailyGiveaway', { ...daily, lastTriggeredDate: currentDate });
+
+        logger.info(`Started daily giveaway ${giveawayMessage.id} in guild ${guildId} (channel ${channel.id})`);
+      } catch (error) {
+        logger.error(`Error starting daily giveaway for guild ${guildId}:`, error);
+      }
+    }
+  } catch (error) {
+    logger.error('Error checking daily giveaways:', error);
+  }
+}
+
 export async function checkGiveaways(client) {
   try {
     if (!client.db) {
