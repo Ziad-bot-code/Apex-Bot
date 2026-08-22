@@ -1,107 +1,148 @@
-// constants.js
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } from 'discord.js';
+import { successEmbed } from '../../utils/embeds.js';
+import { logger } from '../../utils/logger.js';
+import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
+import { setConfigValue, getGuildConfig } from '../../services/config/guildConfig.js';
+import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { parseDuration, validatePrize, validateWinnerCount } from '../../services/giveawayService.js';
 
-export const DEFAULT_ECONOMY_DATA = {
-    wallet: 0,
-    bank: 0,
-    bankLevel: 0,
-    xp: 0,
-    level: 1,
-    lastDaily: 0,
-    lastWork: 0,
-    lastCrime: 0,
-    lastRob: 0,
-    lastMine: 0,
-    lastGamble: 0,
-    lastFish: 0,
-    dailyStreak: 0,
-    lastWeekly: 0,
-    lastDeposit: 0,
-    lastWithdraw: 0,
-    inventory: {},
-    upgrades: {},
-    cooldowns: {}
-};
-
-export const DEFAULT_GUILD_CONFIG = {
-    enabledCommands: {},
-    birthdayChannelId: null,
-    premiumRoleId: null,
-    modRole: null,
-    adminRole: null,
-    welcomeChannel: null,
-    autoRole: null,
-    giveawayPingRoleId: null,
-    logging: {
-        enabled: false,
-        channels: { audit: null, applications: null, reports: null },
-        ignore: { users: [], channels: [] },
-        enabledEvents: {},
-    },
-    verification: {
-        enabled: false
-    },
-    dailyGiveaway: {
-        enabled: false,
-        time: null,
-        channelId: null,
-        prize: null,
-        durationString: null,
-        winnerCount: 1,
-        lastTriggeredDate: null
-    }
-};
-
-export const INTERACTION_TIMEOUTS = {
-    EXPIRE: 15 * 60 * 1000,  
-    DEFER_TIMEOUT: 3000,      
-    REPLY_TIMEOUT: 3000       
-};
-
-export const STORAGE_LIMITS = {
-    MAX_EMBED_TITLE: 256,
-    MAX_EMBED_DESCRIPTION: 4096,
-    MAX_EMBED_FIELDS: 25,
-    MAX_EMBED_FIELD_NAME: 256,
-    MAX_EMBED_FIELD_VALUE: 1024,
-    MAX_BUTTON_LABEL: 80,
-    MAX_BUTTON_CUSTOM_ID: 100,
-    MAX_SELECT_PLACEHOLDER: 150,
-    MAX_USER_INPUT: 2000,
-    MAX_CUSTOM_ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
-    MAX_BUTTONS_PER_ROW: 5
-};
-
-export const DEFAULTS = {
-    EMPTY_ARRAY: [],
-    EMPTY_OBJECT: {},
-    EMPTY_STRING: '',
-    ZERO: 0,
-    FALSE: false,
-    NULL: null
-};
-
-export const ERROR_DEFAULTS = {
-    INVALID_INPUT: 'Invalid input provided',
-    DATABASE_ERROR: 'Database operation failed',
-    NOT_FOUND: 'Not found',
-    INSUFFICIENT_PERMISSIONS: 'Insufficient permissions',
-    INVALID_FORMAT: 'Invalid format'
-};
-
-export const TIME = {
-    SECOND: 1000,
-    MINUTE: 60 * 1000,
-    HOUR: 60 * 60 * 1000,
-    DAY: 24 * 60 * 60 * 1000,
-    WEEK: 7 * 24 * 60 * 60 * 1000
-};
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export default {
-    DEFAULT_ECONOMY_DATA,
-    DEFAULT_GUILD_CONFIG,
-    INTERACTION_TIMEOUTS,
-    STORAGE_LIMITS,
-    DEFAULTS,
-    ERROR_DEFAULTS,
-    TIME
+    data: new SlashCommandBuilder()
+        .setName('setdailygiveaway')
+        .setDescription('Configures an automatic daily giveaway that starts at a set UTC time each day.')
+        .addStringOption((option) =>
+            option
+                .setName('time')
+                .setDescription('24h UTC time to start the giveaway each day, e.g. 18:00')
+                .setRequired(true),
+        )
+        .addChannelOption((option) =>
+            option
+                .setName('channel')
+                .setDescription('The channel the daily giveaway should be posted in.')
+                .addChannelTypes(ChannelType.GuildText)
+                .setRequired(true),
+        )
+        .addStringOption((option) =>
+            option
+                .setName('prize')
+                .setDescription('The prize for the daily giveaway.')
+                .setRequired(true),
+        )
+        .addStringOption((option) =>
+            option
+                .setName('duration')
+                .setDescription('How long each daily giveaway should run for, e.g. 1h, 30m, 5h.')
+                .setRequired(true),
+        )
+        .addIntegerOption((option) =>
+            option
+                .setName('winners')
+                .setDescription('Number of winners for each daily giveaway.')
+                .setMinValue(1)
+                .setMaxValue(20)
+                .setRequired(true),
+        )
+        .addRoleOption((option) =>
+            option
+                .setName('ping')
+                .setDescription('Role to ping when the daily giveaway starts. Leave empty for no ping.')
+                .setRequired(false),
+        )
+        .addBooleanOption((option) =>
+            option
+                .setName('enabled')
+                .setDescription('Whether the daily giveaway should be active. Defaults to true.')
+                .setRequired(false),
+        )
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+
+    async execute(interaction) {
+        await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+
+        if (!interaction.inGuild()) {
+            throw new TitanBotError(
+                'setdailygiveaway used outside guild',
+                ErrorTypes.VALIDATION,
+                'This command can only be used in a server.',
+                { userId: interaction.user.id },
+            );
+        }
+
+        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+            throw new TitanBotError(
+                'User lacks ManageGuild permission',
+                ErrorTypes.PERMISSION,
+                "You need the 'Manage Server' permission to set up the daily giveaway.",
+                { userId: interaction.user.id, guildId: interaction.guildId },
+            );
+        }
+
+        const time = interaction.options.getString('time').trim();
+        const channel = interaction.options.getChannel('channel');
+        const prizeInput = interaction.options.getString('prize');
+        const durationString = interaction.options.getString('duration').trim();
+        const winnerCount = interaction.options.getInteger('winners');
+        const pingRole = interaction.options.getRole('ping');
+        const enabledOption = interaction.options.getBoolean('enabled');
+        const enabled = enabledOption === null ? true : enabledOption;
+
+        if (!TIME_PATTERN.test(time)) {
+            throw new TitanBotError(
+                'Invalid daily giveaway time format',
+                ErrorTypes.VALIDATION,
+                'Time must be in 24h UTC format, e.g. 18:00 or 09:30.',
+                { time },
+            );
+        }
+
+        if (!channel.isTextBased()) {
+            throw new TitanBotError(
+                'Daily giveaway channel is not text-based',
+                ErrorTypes.VALIDATION,
+                'The channel must be a text channel.',
+                { channelId: channel.id, channelType: channel.type },
+            );
+        }
+
+        // Validate now so the admin gets immediate feedback instead of a silent failure at trigger time.
+        parseDuration(durationString);
+        validateWinnerCount(winnerCount);
+        const prize = validatePrize(prizeInput);
+
+        const existingConfig = await getGuildConfig(interaction.client, interaction.guildId).catch(() => ({}));
+        const existingDaily = existingConfig?.dailyGiveaway || {};
+
+        const dailyGiveaway = {
+            enabled,
+            time,
+            channelId: channel.id,
+            prize,
+            durationString,
+            winnerCount,
+            pingRoleId: pingRole ? pingRole.id : null,
+            // Reset so a same-day config change doesn't block today's run if the new time is still ahead.
+            lastTriggeredDate: existingDaily.time === time ? existingDaily.lastTriggeredDate || null : null,
+        };
+
+        await setConfigValue(interaction.client, interaction.guildId, 'dailyGiveaway', dailyGiveaway);
+
+        logger.info(
+            `Daily giveaway ${enabled ? 'configured' : 'disabled'} for guild ${interaction.guildId} by ${interaction.user.tag}: time=${time}, channel=${channel.id}, prize=${prize}, duration=${durationString}, winners=${winnerCount}, pingRole=${pingRole?.id || 'none'}`,
+        );
+
+        await InteractionHelper.safeReply(interaction, {
+            embeds: [
+                successEmbed(
+                    'Daily Giveaway Configured',
+                    enabled
+                        ? `A giveaway for **${prize}** will start automatically in ${channel} at **${time} UTC** every day, running for **${durationString}** with **${winnerCount}** winner(s).${pingRole ? ` ${pingRole} will be pinged each time.` : ''}`
+                        : `Daily giveaway settings saved for ${channel}, but it's currently **disabled**. Run this command again with \`enabled: true\` to turn it on.`,
+                ),
+            ],
+            flags: MessageFlags.Ephemeral,
+        });
+    },
 };
