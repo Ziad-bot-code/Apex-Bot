@@ -45,6 +45,12 @@ export default {
                 .setMaxValue(20)
                 .setRequired(true),
         )
+        .addRoleOption((option) =>
+            option
+                .setName('ping')
+                .setDescription('Role to ping when the daily giveaway starts. Leave empty for no ping.')
+                .setRequired(false),
+        )
         .addBooleanOption((option) =>
             option
                 .setName('enabled')
@@ -79,6 +85,7 @@ export default {
         const prizeInput = interaction.options.getString('prize');
         const durationString = interaction.options.getString('duration').trim();
         const winnerCount = interaction.options.getInteger('winners');
+        const pingRole = interaction.options.getRole('ping');
         const enabledOption = interaction.options.getBoolean('enabled');
         const enabled = enabledOption === null ? true : enabledOption;
 
@@ -115,6 +122,7 @@ export default {
             prize,
             durationString,
             winnerCount,
+            pingRoleId: pingRole ? pingRole.id : null,
             // Reset so a same-day config change doesn't block today's run if the new time is still ahead.
             lastTriggeredDate: existingDaily.time === time ? existingDaily.lastTriggeredDate || null : null,
         };
@@ -122,7 +130,7 @@ export default {
         await setConfigValue(interaction.client, interaction.guildId, 'dailyGiveaway', dailyGiveaway);
 
         logger.info(
-            `Daily giveaway ${enabled ? 'configured' : 'disabled'} for guild ${interaction.guildId} by ${interaction.user.tag}: time=${time}, channel=${channel.id}, prize=${prize}, duration=${durationString}, winners=${winnerCount}`,
+            `Daily giveaway ${enabled ? 'configured' : 'disabled'} for guild ${interaction.guildId} by ${interaction.user.tag}: time=${time}, channel=${channel.id}, prize=${prize}, duration=${durationString}, winners=${winnerCount}, pingRole=${pingRole?.id || 'none'}`,
         );
 
         await InteractionHelper.safeReply(interaction, {
@@ -130,7 +138,7 @@ export default {
                 successEmbed(
                     'Daily Giveaway Configured',
                     enabled
-                        ? `A giveaway for **${prize}** will start automatically in ${channel} at **${time} UTC** every day, running for **${durationString}** with **${winnerCount}** winner(s).`
+                        ? `A giveaway for **${prize}** will start automatically in ${channel} at **${time} UTC** every day, running for **${durationString}** with **${winnerCount}** winner(s).${pingRole ? ` ${pingRole} will be pinged each time.` : ''}`
                         : `Daily giveaway settings saved for ${channel}, but it's currently **disabled**. Run this command again with \`enabled: true\` to turn it on.`,
                 ),
             ],
