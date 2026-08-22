@@ -57,6 +57,18 @@ const VerificationConfigSchema = z
   })
   .optional();
 
+const DailyGiveawayConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    time: z.string().nullable().optional(),
+    channelId: z.string().nullable().optional(),
+    prize: z.string().nullable().optional(),
+    durationString: z.string().nullable().optional(),
+    winnerCount: z.number().int().min(1).max(20).default(1),
+    lastTriggeredDate: z.string().nullable().optional()
+  })
+  .optional();
+
 export const GuildConfigSchema = z
   .object({
     prefix: z.string().optional(),
@@ -71,6 +83,7 @@ export const GuildConfigSchema = z
     birthdayChannelId: z.string().nullable().optional(),
     premiumRoleId: z.string().nullable().optional(),
     giveawayPingRoleId: z.string().nullable().optional(),
+    dailyGiveaway: DailyGiveawayConfigSchema,
     logIgnore: LogIgnoreSchema.optional(),
     disabledCommands: z.record(z.boolean()).optional(),
     disabledCategories: z.record(z.boolean()).optional(),
