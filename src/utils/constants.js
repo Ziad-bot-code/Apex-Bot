@@ -1,4 +1,5 @@
 // constants.js
+
 export const DEFAULT_ECONOMY_DATA = {
     wallet: 0,
     bank: 0,
@@ -20,6 +21,7 @@ export const DEFAULT_ECONOMY_DATA = {
     upgrades: {},
     cooldowns: {}
 };
+
 export const DEFAULT_GUILD_CONFIG = {
     enabledCommands: {},
     birthdayChannelId: null,
@@ -37,13 +39,24 @@ export const DEFAULT_GUILD_CONFIG = {
     },
     verification: {
         enabled: false
+    },
+    dailyGiveaway: {
+        enabled: false,
+        time: null,
+        channelId: null,
+        prize: null,
+        durationString: null,
+        winnerCount: 1,
+        lastTriggeredDate: null
     }
 };
+
 export const INTERACTION_TIMEOUTS = {
     EXPIRE: 15 * 60 * 1000,  
     DEFER_TIMEOUT: 3000,      
     REPLY_TIMEOUT: 3000       
 };
+
 export const STORAGE_LIMITS = {
     MAX_EMBED_TITLE: 256,
     MAX_EMBED_DESCRIPTION: 4096,
@@ -57,6 +70,7 @@ export const STORAGE_LIMITS = {
     MAX_CUSTOM_ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
     MAX_BUTTONS_PER_ROW: 5
 };
+
 export const DEFAULTS = {
     EMPTY_ARRAY: [],
     EMPTY_OBJECT: {},
@@ -65,6 +79,7 @@ export const DEFAULTS = {
     FALSE: false,
     NULL: null
 };
+
 export const ERROR_DEFAULTS = {
     INVALID_INPUT: 'Invalid input provided',
     DATABASE_ERROR: 'Database operation failed',
@@ -72,6 +87,7 @@ export const ERROR_DEFAULTS = {
     INSUFFICIENT_PERMISSIONS: 'Insufficient permissions',
     INVALID_FORMAT: 'Invalid format'
 };
+
 export const TIME = {
     SECOND: 1000,
     MINUTE: 60 * 1000,
@@ -79,6 +95,7 @@ export const TIME = {
     DAY: 24 * 60 * 60 * 1000,
     WEEK: 7 * 24 * 60 * 60 * 1000
 };
+
 export default {
     DEFAULT_ECONOMY_DATA,
     DEFAULT_GUILD_CONFIG,
