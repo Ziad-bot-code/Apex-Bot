@@ -433,7 +433,7 @@ export async function checkDailyGiveaways(client) {
         const embed = createGiveawayEmbed(initialGiveawayData, 'active');
         const row = createGiveawayButtons(false);
 
-        const pingRoleId = config?.giveawayPingRoleId || null;
+        const pingRoleId = daily.pingRoleId || config?.giveawayPingRoleId || null;
         const pingContent = pingRoleId ? `<@&${pingRoleId}> ` : '';
 
         const giveawayMessage = await channel.send({
