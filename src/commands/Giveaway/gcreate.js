@@ -63,18 +63,21 @@ export default {
             );
         }
 
-        // Fetch dynamic guild config set via /configwizard
+        // Fetch dynamic guild config set via /configwizard or /setaccsgiveaway
         const guildConfig = await getGuildConfig(interaction.client, interaction.guildId).catch(() => null);
 
-        // Check permissions: Manage Server OR static allowedRoles OR dynamic moderatorRoleId
+        // Permissions logic: Manage Guild OR botConfig allowed roles OR configured giveaway access role OR moderator role
         const allowedRoles = botConfig.giveaways?.allowedRoles || [];
         const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
         const hasAllowedRole = interaction.member.roles.cache.some((role) => allowedRoles.includes(role.id));
-        const hasModRole = guildConfig?.moderatorRoleId 
-            ? interaction.member.roles.cache.has(guildConfig.moderatorRoleId) 
+        
+        // Checks specifically for giveawayAccessRoleId set by /setaccsgiveaway, falling back to moderatorRoleId
+        const customAccessRoleId = guildConfig?.giveawayAccessRoleId || guildConfig?.moderatorRoleId;
+        const hasCustomAccessRole = customAccessRoleId 
+            ? interaction.member.roles.cache.has(customAccessRoleId) 
             : false;
 
-        if (!hasManageGuild && !hasAllowedRole && !hasModRole) {
+        if (!hasManageGuild && !hasAllowedRole && !hasCustomAccessRole) {
             throw new TitanBotError(
                 'User lacks permission to host giveaway',
                 ErrorTypes.PERMISSION,
