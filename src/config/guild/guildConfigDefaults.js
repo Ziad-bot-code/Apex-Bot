@@ -1,3 +1,5 @@
-autoTicketOnWin: false,
-ticketStaffRoleId: null,
-ticketCategoryId: null,
+export default {
+    autoTicketOnWin: false,
+    ticketStaffRoleId: null,
+    ticketCategoryId: null,
+};
