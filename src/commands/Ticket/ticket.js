@@ -50,7 +50,6 @@ export default {
         const staffRole = interaction.options.getRole("staff_role");
         const category = interaction.options.getChannel("category");
 
-        // Save ticket settings using your existing updateGuildConfig service
         await updateGuildConfig(interaction.client, interaction.guildId, {
             autoTicketOnWin: enabled,
             ticketStaffRoleId: staffRole.id,
