@@ -63,12 +63,18 @@ export default {
             );
         }
 
-        // Check permissions: Manage Server OR Role in allowedRoles (botConfig)
+        // Fetch dynamic guild config set via /configwizard
+        const guildConfig = await getGuildConfig(interaction.client, interaction.guildId).catch(() => null);
+
+        // Check permissions: Manage Server OR static allowedRoles OR dynamic moderatorRoleId
         const allowedRoles = botConfig.giveaways?.allowedRoles || [];
         const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
         const hasAllowedRole = interaction.member.roles.cache.some((role) => allowedRoles.includes(role.id));
+        const hasModRole = guildConfig?.moderatorRoleId 
+            ? interaction.member.roles.cache.has(guildConfig.moderatorRoleId) 
+            : false;
 
-        if (!hasManageGuild && !hasAllowedRole) {
+        if (!hasManageGuild && !hasAllowedRole && !hasModRole) {
             throw new TitanBotError(
                 'User lacks permission to host giveaway',
                 ErrorTypes.PERMISSION,
@@ -117,7 +123,6 @@ export default {
         const embed = createGiveawayEmbed(initialGiveawayData, "active");
         const row = createGiveawayButtons(false);
 
-        const guildConfig = await getGuildConfig(interaction.client, interaction.guildId).catch(() => null);
         const pingRoleId = guildConfig?.giveawayPingRoleId || null;
         const pingContent = pingRoleId ? `<@&${pingRoleId}> ` : "";
 
