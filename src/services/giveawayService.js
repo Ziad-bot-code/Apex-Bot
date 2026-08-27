@@ -1,5 +1,5 @@
 import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
-import { getGuildConfig } from '../config/guild/guildConfig.js';
+import { getGuildConfig } from './config/configService.js';
 import { saveTicketData, incrementTicketCounter } from '../utils/database/tickets.js';
 import { logger } from '../utils/logger.js';
 
