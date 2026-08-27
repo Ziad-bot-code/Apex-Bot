@@ -2,7 +2,7 @@ import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } f
 import { successEmbed } from '../../utils/embeds.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { updateGuildConfig } from '../../services/config/guildConfig.js';
+import { updateGuildConfig } from '../../config/guild/guildConfig.js';
 
 export default {
     data: new SlashCommandBuilder()
