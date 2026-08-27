@@ -66,7 +66,7 @@ export default {
                     throw createError(
                         "Work cooldown active",
                         ErrorTypes.RATE_LIMIT,
-                        `You're working too fast! Wait **${Math.floor(remaining / 3600000)}h ${Math.floor((remaining % 3600000) / 60000)}m** before working again.`,
+                        `You're working too fast! Wait **${Math.floor(remaining / 600000)}h ${Math.floor((remaining % 600000) / 60000)}m** before working again.`,
                         { timeRemaining: remaining, cooldownType: 'work' }
                     );
                 }
