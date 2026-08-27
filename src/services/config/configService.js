@@ -24,12 +24,17 @@ const CONFIG_VALIDATION_RULES = {
     maxTicketsPerUser: { type: 'number', required: false, min: 1, max: 50 },
     birthdayChannelId: { type: 'channel', required: false },
     logIgnore: { type: 'object', required: false },
-    logging: { type: 'object', required: false }
+    logging: { type: 'object', required: false },
+    autoTicketOnWin: { type: 'boolean', required: false },
+    ticketStaffRoleId: { type: 'role', required: false },
+    ticketCategoryId: { type: 'channel', required: false }
 };
 
 const SETTING_CONFLICTS = {
     'birthdayChannelId': [],
     'logging': [],
+    'ticketCategoryId': [],
+    'ticketStaffRoleId': []
 };
 
 const LEGACY_LOGGING_KEY_MAP = {
@@ -40,17 +45,20 @@ const LEGACY_LOGGING_KEY_MAP = {
 const ConfigValueSchemas = Object.freeze({
     logChannelId: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
     reportChannelId: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
-    premiumRoleId: z.union([z.string().min(1), z.object({ id: z.string().min(1) })]),
+    premiumRoleId: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
     giveawayPingRoleId: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
-    autoRole: z.union([z.string().min(1), z.object({ id: z.string().min(1) })]),
-    modRole: z.union([z.string().min(1), z.object({ id: z.string().min(1) })]),
-    adminRole: z.union([z.string().min(1), z.object({ id: z.string().min(1) })]),
+    autoRole: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
+    modRole: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
+    adminRole: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
     prefix: z.string().min(1).max(10),
     dmOnClose: z.boolean(),
     maxTicketsPerUser: z.number().int().min(1).max(50),
-    birthdayChannelId: z.union([z.string().min(1), z.object({ id: z.string().min(1) })]),
+    birthdayChannelId: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
     logIgnore: LogIgnoreSchema,
     logging: LoggingConfigSchema,
+    autoTicketOnWin: z.boolean(),
+    ticketStaffRoleId: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
+    ticketCategoryId: z.union([z.string().min(1), z.object({ id: z.string().min(1) }), z.null()]),
 });
 
 class ConfigService {
@@ -154,6 +162,7 @@ class ConfigService {
         }
 
         if (rule.type === 'channel') {
+            if (value === null || value === undefined) return true;
             if (typeof value !== 'string' && typeof value !== 'object') {
                 throw createError(
                     'Invalid channel',
@@ -175,19 +184,11 @@ class ConfigService {
                 );
             }
 
-            if (!channel.isTextBased?.()) {
-                throw createError(
-                    'Invalid channel type',
-                    ErrorTypes.VALIDATION,
-                    'Only text channels are allowed.',
-                    { key, channelId, channelType: channel.type }
-                );
-            }
-
             return true;
         }
 
         if (rule.type === 'role') {
+            if (value === null || value === undefined) return true;
             if (typeof value !== 'string' && typeof value !== 'object') {
                 throw createError(
                     'Invalid role',
@@ -210,7 +211,7 @@ class ConfigService {
             }
 
             const botHighestRole = guild.members.me?.roles.highest;
-            if (role.position >= botHighestRole?.position) {
+            if (botHighestRole && role.position >= botHighestRole.position) {
                 throw createError(
                     'Role too high',
                     ErrorTypes.VALIDATION,
@@ -322,7 +323,6 @@ class ConfigService {
 
         for (const related of relatedSettings) {
             if (related === 'logging' && value === null) {
-                
                 if (currentConfig.logging?.enabled) {
                     conflicts.push(
                         `Disabling log channel but logging system is still enabled. Consider disabling logging first.`
@@ -373,14 +373,6 @@ class ConfigService {
         const currentConfig = await getGuildConfig(client, guildId);
 
         const conflicts = this.detectConflicts(currentConfig, key, value);
-        if (conflicts.length > 0) {
-            logger.warn(`[CONFIG_SERVICE] Config conflicts detected`, {
-                guildId,
-                key,
-                conflicts
-            });
-            
-        }
 
         const oldValue = currentConfig[key];
 
@@ -591,11 +583,13 @@ class ConfigService {
                     status: channel ? 'Valid' : 'Missing'
                 };
             } else if (rule.type === 'role' && value) {
-                const role = guild.roles.cache.get(value);
+                const role = guild.roles.cache.get(roleId); // fixed variable scoping or cache lookup:
+                // Using guild.roles.cache.get(value) properly below:
+                const fetchedRole = guild.roles.cache.get(value);
                 summary[key] = {
                     id: value,
-                    name: role?.name || 'Unknown',
-                    status: role ? 'Valid' : 'Missing'
+                    name: fetchedRole?.name || 'Unknown',
+                    status: fetchedRole ? 'Valid' : 'Missing'
                 };
             } else {
                 summary[key] = value;
