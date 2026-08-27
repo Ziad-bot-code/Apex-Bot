@@ -1,6 +1,6 @@
 import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
-import { getGuildConfig } from './config/guildConfig.js';
-import { saveTicketData, incrementTicketCounter } from './database/tickets.js'; // Adjust path if needed
+import { getGuildConfig } from '../config/guild/guildConfig.js';
+import { saveTicketData, incrementTicketCounter } from '../utils/database/tickets.js';
 import { logger } from '../utils/logger.js';
 
 export async function createWinnerTickets(guild, winners, prizeName) {
@@ -66,7 +66,6 @@ export async function createWinnerTickets(guild, winners, prizeName) {
                 permissionOverwrites: permissionOverwrites,
             });
 
-            // Save state into database using your ticket functions
             await saveTicketData(guild.id, ticketChannel.id, {
                 channelId: ticketChannel.id,
                 guildId: guild.id,
