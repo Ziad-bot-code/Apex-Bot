@@ -1,194 +1,75 @@
-import { logger } from '../logger.js';
-import { db, getFromDb } from './wrapper.js';
-import { getTicketCounterKey, getTicketKey } from './keys.js';
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } from 'discord.js';
+import { successEmbed } from '../../utils/embeds.js';
+import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
+import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { updateGuildConfig } from '../../services/config/guildConfig.js';
 
-export { getTicketKey, getTicketCounterKey } from './keys.js';
+export default {
+    data: new SlashCommandBuilder()
+        .setName("ticket")
+        .setDescription("Ticket system configuration commands.")
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addSubcommand((subcommand) =>
+            subcommand
+                .setName("setup")
+                .setDescription("Configure auto-ticket settings for giveaway winners.")
+                .addBooleanOption((option) =>
+                    option
+                        .setName("enabled")
+                        .setDescription("Turn auto-ticket creation ON or OFF when a giveaway ends.")
+                        .setRequired(true)
+                )
+                .addRoleOption((option) =>
+                    option
+                        .setName("staff_role")
+                        .setDescription("Role granted access permissions to winner tickets.")
+                        .setRequired(true)
+                )
+                .addChannelOption((option) =>
+                    option
+                        .setName("category")
+                        .setDescription("Category where ticket channels will be created.")
+                        .addChannelTypes(ChannelType.GuildCategory)
+                        .setRequired(false)
+                )
+        ),
 
-export async function getTicketData(guildId, channelId) {
-    if (!db.initialized) {
-        await db.initialize();
-    }
+    async execute(interaction) {
+        await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
 
-    const key = getTicketKey(guildId, channelId);
-    return await db.get(key);
-}
-
-export async function getOpenTicketCountForUser(guildId, userId) {
-    try {
-        if (!db.initialized) {
-            await db.initialize();
-        }
-
-        if (db.db?.pool && typeof db.db.isAvailable === 'function' && db.db.isAvailable()) {
-            const { pgConfig } = await import('../../config/database/postgres.js');
-            const result = await db.db.pool.query(
-                `SELECT COUNT(*)::int AS count FROM ${pgConfig.tables.tickets}
-                 WHERE guild_id = $1
-                   AND data->>'userId' = $2
-                   AND data->>'status' = 'open'`,
-                [guildId, userId],
+        if (!interaction.inGuild()) {
+            throw new TitanBotError(
+                'Command used outside guild',
+                ErrorTypes.VALIDATION,
+                'This command can only be used in a server.',
+                { userId: interaction.user.id }
             );
-
-            return Number(result.rows?.[0]?.count || 0);
         }
 
-        if (typeof db.list === 'function') {
-            const ticketKeys = await db.list(`guild:${guildId}:ticket:`);
-            let count = 0;
+        const enabled = interaction.options.getBoolean("enabled");
+        const staffRole = interaction.options.getRole("staff_role");
+        const category = interaction.options.getChannel("category");
 
-            for (const key of ticketKeys) {
-                if (key.endsWith(':counter')) continue;
-                const ticket = await getFromDb(key, null);
-                if (ticket && ticket.userId === userId && ticket.status === 'open') {
-                    count += 1;
-                }
-            }
-
-            return count;
-        }
-
-        return 0;
-    } catch (error) {
-        logger.error(`Error counting open tickets for user ${userId} in guild ${guildId}:`, error);
-        return 0;
-    }
-}
-
-export async function saveTicketData(guildId, channelId, data) {
-    if (!db.initialized) {
-        await db.initialize();
-    }
-
-    const key = getTicketKey(guildId, channelId);
-    await db.set(key, data);
-}
-
-export async function deleteTicketData(guildId, channelId) {
-    if (!db.initialized) {
-        await db.initialize();
-    }
-
-    const key = getTicketKey(guildId, channelId);
-    await db.delete(key);
-}
-
-export async function getTicketCounter(guildId) {
-    if (!db.initialized) {
-        await db.initialize();
-    }
-
-    const key = getTicketCounterKey(guildId);
-    const counter = await db.get(key);
-    return counter || 0;
-}
-
-export async function incrementTicketCounter(guildId) {
-    if (!db.initialized) {
-        await db.initialize();
-    }
-
-    const key = getTicketCounterKey(guildId);
-    const currentCounter = await getTicketCounter(guildId);
-    const nextCounter = currentCounter + 1;
-
-    await db.set(key, nextCounter);
-
-    return nextCounter.toString().padStart(3, '0');
-}
-
-export async function listGuildTickets(guildId) {
-    if (!db.initialized) {
-        await db.initialize();
-    }
-
-    if (db.db?.pool && typeof db.db.isAvailable === 'function' && db.db.isAvailable()) {
-        const { pgConfig } = await import('../../config/database/postgres.js');
-        const result = await db.db.pool.query(
-            `SELECT data FROM ${pgConfig.tables.tickets} WHERE guild_id = $1`,
-            [guildId],
-        );
-        return result.rows.map((row) => row.data).filter(Boolean);
-    }
-
-    if (typeof db.list !== 'function') {
-        return [];
-    }
-
-    const ticketKeys = await db.list(`guild:${guildId}:ticket:`);
-    const tickets = [];
-
-    for (const key of ticketKeys) {
-        if (key.endsWith(':counter')) continue;
-        const ticket = await getFromDb(key, null);
-        if (ticket) tickets.push(ticket);
-    }
-
-    return tickets;
-}
-
-export async function getTicketsDueForAutoClose(guildId) {
-    try {
-        const tickets = await listGuildTickets(guildId);
-        const now = Date.now();
-
-        return tickets.filter((ticket) => {
-            if (!ticket || ticket.status !== 'open') return false;
-            if (!ticket.autoCloseAt) return false;
-            const autoCloseAt = new Date(ticket.autoCloseAt).getTime();
-            return Number.isFinite(autoCloseAt) && autoCloseAt <= now;
+        // Save ticket settings using your existing updateGuildConfig service
+        await updateGuildConfig(interaction.client, interaction.guildId, {
+            autoTicketOnWin: enabled,
+            ticketStaffRoleId: staffRole.id,
+            ticketCategoryId: category ? category.id : null,
         });
-    } catch (error) {
-        logger.error(`Error listing tickets due for auto-close in guild ${guildId}:`, error);
-        return [];
-    }
-}
 
-export async function getGuildTicketStats(guildId) {
-    try {
-        const tickets = await listGuildTickets(guildId);
-        let openCount = 0;
-        let closedCount = 0;
-        let totalCloseMs = 0;
-        let closeSamples = 0;
-        let feedbackCount = 0;
-        let ratingSum = 0;
+        const statusLabel = enabled ? "🟢 **ENABLED (ON)**" : "🔴 **DISABLED (OFF)**";
+        const categoryLabel = category ? `${category}` : "None (Default)";
 
-        for (const ticket of tickets) {
-            if (ticket.status === 'open') {
-                openCount += 1;
-            } else if (ticket.status === 'closed') {
-                closedCount += 1;
-                if (ticket.createdAt && ticket.closedAt) {
-                    const duration = new Date(ticket.closedAt) - new Date(ticket.createdAt);
-                    if (Number.isFinite(duration) && duration >= 0) {
-                        totalCloseMs += duration;
-                        closeSamples += 1;
-                    }
-                }
-            }
-
-            const rating = ticket.feedback?.rating;
-            if (rating != null && Number.isFinite(Number(rating))) {
-                feedbackCount += 1;
-                ratingSum += Number(rating);
-            }
-        }
-
-        return {
-            openCount,
-            closedCount,
-            avgCloseTimeMs: closeSamples > 0 ? Math.round(totalCloseMs / closeSamples) : null,
-            feedbackCount,
-            avgRating: feedbackCount > 0 ? Math.round((ratingSum / feedbackCount) * 10) / 10 : null,
-        };
-    } catch (error) {
-        logger.error(`Error computing ticket stats for guild ${guildId}:`, error);
-        return {
-            openCount: 0,
-            closedCount: 0,
-            avgCloseTimeMs: null,
-            feedbackCount: 0,
-            avgRating: null,
-        };
-    }
-}
+        await InteractionHelper.safeReply(interaction, {
+            embeds: [
+                successEmbed(
+                    `Ticket Settings Saved! 🎫`,
+                    `**Auto-Ticket System:** ${statusLabel}\n` +
+                    `**Staff Role Access:** ${staffRole}\n` +
+                    `**Ticket Category:** ${categoryLabel}`
+                ),
+            ],
+            flags: MessageFlags.Ephemeral,
+        });
+    },
+};
