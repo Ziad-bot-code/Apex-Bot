@@ -53,7 +53,7 @@ export default {
         ),
 
     async execute(interaction) {
-        await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+        await InteractionHelper.safeDefer(interaction);
 
         const spawnerKey = interaction.options.getString('spawner');
         const amount = interaction.options.getInteger('amount');
@@ -104,7 +104,6 @@ export default {
 
         await InteractionHelper.safeReply(interaction, {
             embeds: [embed],
-            flags: MessageFlags.Ephemeral,
         });
     },
 };
