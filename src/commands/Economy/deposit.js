@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { successEmbed, buildUserErrorEmbed } from '../../utils/embeds.js';
-import { getEconomyData, setEconomyData, getMaxBankCapacity } from '../../utils/economy.js';
+import { getEconomyData, setEconomyData } from '../../utils/economy.js';
 import { withErrorHandling, createError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
@@ -34,7 +34,6 @@ export default {
                 );
             }
             
-            const maxBank = getMaxBankCapacity(userData);
             let depositAmount;
 
             if (amountInput.toLowerCase() === "all") {
@@ -74,40 +73,12 @@ export default {
                 });
             }
 
-            const availableSpace = maxBank - userData.bank;
-
-            if (availableSpace <= 0) {
-                throw createError(
-                    "Bank is full",
-                    ErrorTypes.VALIDATION,
-                    `Your bank is currently full (Max Capacity: $${maxBank.toLocaleString()}). Purchase a **Bank Upgrade** to increase your limit.`,
-                    { maxBank, currentBank: userData.bank, userId }
-                );
-            }
-
-            if (depositAmount > availableSpace) {
-                const originalDepositAmount = depositAmount;
-                depositAmount = availableSpace;
-
-                if (amountInput.toLowerCase() !== "all") {
-                    await interaction.followUp({
-                        embeds: [
-                            buildUserErrorEmbed(
-                                'validation',
-                                `You only had space for **$${depositAmount.toLocaleString()}** in your bank account (Max: $${maxBank.toLocaleString()}). The rest remains in your cash.`
-                            )
-                        ],
-                        flags: MessageFlags.Ephemeral,
-                    });
-                }
-            }
-
             if (depositAmount === 0) {
                 throw createError(
-                    "No space or cash for deposit",
+                    "No cash for deposit",
                     ErrorTypes.VALIDATION,
-                    "The amount you tried to deposit was either 0 or exceeded your bank capacity after checking your cash balance.",
-                    { depositAmount, availableSpace, walletBalance: userData.wallet }
+                    "You have no cash to deposit.",
+                    { depositAmount, walletBalance: userData.wallet }
                 );
             }
 
@@ -128,7 +99,7 @@ export default {
                     },
                     {
                         name: "New Bank Balance",
-                        value: `$${userData.bank.toLocaleString()} / $${maxBank.toLocaleString()}`,
+                        value: `$${userData.bank.toLocaleString()}`,
                         inline: true,
                     },
                 );
