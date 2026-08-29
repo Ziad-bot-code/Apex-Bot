@@ -84,6 +84,13 @@ export const GuildConfigSchema = z
     birthdayChannelId: z.string().nullable().optional(),
     premiumRoleId: z.string().nullable().optional(),
     giveawayPingRoleId: z.string().nullable().optional(),
+    winnerTicketEnabled: z.boolean().optional(),
+    giveawayMultipliers: z.array(
+      z.object({
+        roleId: z.string(),
+        multiplier: z.number().int().min(2).max(10),
+      })
+    ).optional(),
     dailyGiveaway: DailyGiveawayConfigSchema,
     logIgnore: LogIgnoreSchema.optional(),
     disabledCommands: z.record(z.boolean()).optional(),
