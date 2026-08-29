@@ -31,6 +31,8 @@ export const DEFAULT_GUILD_CONFIG = {
     welcomeChannel: null,
     autoRole: null,
     giveawayPingRoleId: null,
+    winnerTicketEnabled: true,
+    giveawayMultipliers: [],
     logging: {
         enabled: false,
         channels: { audit: null, applications: null, reports: null },
