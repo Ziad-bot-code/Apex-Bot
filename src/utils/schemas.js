@@ -85,6 +85,8 @@ export const GuildConfigSchema = z
     premiumRoleId: z.string().nullable().optional(),
     giveawayPingRoleId: z.string().nullable().optional(),
     winnerTicketEnabled: z.boolean().optional(),
+    quickDropAccessRoleId: z.string().nullable().optional(),
+    quickDropPingRoleId: z.string().nullable().optional(),
     giveawayMultipliers: z.array(
       z.object({
         roleId: z.string(),
