@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { getGuildConfig } from '../../services/config/guildConfig.js';
-
+ 
 export default {
     data: new SlashCommandBuilder()
         .setName('promote')
@@ -34,10 +34,10 @@ export default {
                 .setRequired(false),
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
-
+ 
     async execute(interaction) {
         await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
-
+ 
         if (!interaction.inGuild()) {
             throw new TitanBotError(
                 'promote used outside guild',
@@ -46,7 +46,7 @@ export default {
                 { userId: interaction.user.id },
             );
         }
-
+ 
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
             throw new TitanBotError(
                 'User lacks ManageRoles permission',
@@ -55,12 +55,12 @@ export default {
                 { userId: interaction.user.id, guildId: interaction.guildId },
             );
         }
-
+ 
         const targetUser = interaction.options.getUser('user');
         const toRole = interaction.options.getRole('to');
         const fromRole = interaction.options.getRole('from');
         const reason = interaction.options.getString('reason');
-
+ 
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         if (!member) {
             throw new TitanBotError(
@@ -70,10 +70,10 @@ export default {
                 { targetUserId: targetUser.id },
             );
         }
-
+ 
         const botMember = interaction.guild.members.me;
         const botHighestPosition = botMember?.roles.highest.position ?? 0;
-
+ 
         if (toRole.position >= botHighestPosition) {
             throw new TitanBotError(
                 'Target role too high for bot',
@@ -82,7 +82,7 @@ export default {
                 { roleId: toRole.id },
             );
         }
-
+ 
         if (fromRole && fromRole.position >= botHighestPosition) {
             throw new TitanBotError(
                 'Role to remove too high for bot',
@@ -91,7 +91,7 @@ export default {
                 { roleId: fromRole.id },
             );
         }
-
+ 
         try {
             if (fromRole && member.roles.cache.has(fromRole.id)) {
                 await member.roles.remove(fromRole);
@@ -108,14 +108,14 @@ export default {
                 { targetUserId: targetUser.id, error: error.message },
             );
         }
-
+ 
         const config = await getGuildConfig(interaction.client, interaction.guildId).catch(() => null);
         const logChannelId = config?.promotionLogChannelId || null;
         const targetChannel = logChannelId
             ? await interaction.guild.channels.fetch(logChannelId).catch(() => null)
             : interaction.channel;
         const destinationChannel = targetChannel && targetChannel.isTextBased() ? targetChannel : interaction.channel;
-
+ 
         const announceEmbed = createEmbed({
             title: '⬆️ Staff Promotion',
             description:
@@ -128,15 +128,15 @@ export default {
             ],
             timestamp: true,
         });
-
+ 
         await destinationChannel.send({ embeds: [announceEmbed] }).catch((sendError) => {
             logger.warn(`Could not send promotion announcement in guild ${interaction.guildId}: ${sendError.message}`);
         });
-
+ 
         logger.info(
             `${interaction.user.tag} promoted ${targetUser.tag} to ${toRole.name}${fromRole ? ` from ${fromRole.name}` : ''} in guild ${interaction.guildId}`,
         );
-
+ 
         await InteractionHelper.safeReply(interaction, {
             embeds: [
                 successEmbed(
@@ -148,3 +148,4 @@ export default {
         });
     },
 };
+ 
