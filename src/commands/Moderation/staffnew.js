@@ -22,7 +22,7 @@ export default {
             .addFields(
                 {
                     name: '📜 Staff Guidelines',
-                    value: '<#154668057522447046>\nRules, expectations, and general staff protocols.',
+                    value: '<#1546680575224447046>\nRules, expectations, and general staff protocols.',
                     inline: false
                 },
                 {
