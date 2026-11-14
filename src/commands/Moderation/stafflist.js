@@ -1,6 +1,5 @@
-import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
 
-// Ordered from highest rank (CEO) to lowest rank (Jr. Helper) matching your screenshots
 const STAFF_ROLES = [
     { name: '— CEO —', id: '1558870361011920928' },
     { name: '— OWNER —', id: '1507318444989616189' },
@@ -10,9 +9,9 @@ const STAFF_ROLES = [
     { name: '— MANAGER —', id: '1507318450840670341' },
     { name: '— SR. ADMIN —', id: '1546181418156167259' },
     { name: '— ADMIN —', id: '1546181240976183327' },
-    { name: '— SR MODERATOR —', id: '1559017971530072144' }, // Matches "SR MODERATOR" style
+    { name: '— SR MODERATOR —', id: '1559017971530072144' },
     { name: '— MODERATOR —', id: '1546181147526955079' },
-    { name: '— JR. MODERATOR —', id: '1546180986709213274' }, // Matches "JR. MODERATOR" style
+    { name: '— JR. MODERATOR —', id: '1546180986709213274' },
     { name: '— SR HELPER —', id: '1559017878873702511' },
     { name: '— HELPER —', id: '1546180847562920017' },
     { name: '— JR.HELPER —', id: '1546180624698835079' }
@@ -21,32 +20,31 @@ const STAFF_ROLES = [
 export default {
     data: new SlashCommandBuilder()
         .setName('stafflist')
-        .setDescription('Displays the official server staff team hierarchy and online members.')
+        .setDescription('Posts the official server staff team hierarchy without showing command usage.')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
 
     async execute(interaction) {
-        await interaction.deferReply();
+        // 1. Defer ephemerally so nobody else sees "Ziad used /stafflist"
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const guild = interaction.guild;
-        // Fetch all members to ensure cache is fully populated
         await guild.members.fetch();
 
         const embed = new EmbedBuilder()
             .setTitle('✦ EUROPEMC • STAFF TEAM')
             .setDescription('**OFFICIAL STAFF MEMBERS & ROLES**\n---------------------------------------')
             .setColor('#3498DB')
-            .setFooter({ text: `EuropeMC • Live staff roles • Checked automatically` })
+            .setFooter({ text: 'EuropeMC • Live staff roles • Checked automatically' })
             .setTimestamp();
 
         for (const roleGroup of STAFF_ROLES) {
             const role = guild.roles.cache.get(roleGroup.id);
-            
+
             if (!role) {
                 embed.addFields({ name: roleGroup.name, value: '*Role not found*', inline: false });
                 continue;
             }
 
-            // Get all members who have this role
             const membersWithRole = role.members.map(member => `${member}`).join('\n');
 
             embed.addFields({
@@ -56,6 +54,10 @@ export default {
             });
         }
 
-        await interaction.editReply({ embeds: [embed] });
+        // 2. Send the embed directly as a normal channel message
+        await interaction.channel.send({ embeds: [embed] });
+
+        // 3. Delete the private interaction acknowledgment so nothing is left behind
+        await interaction.deleteReply();
     },
 };
