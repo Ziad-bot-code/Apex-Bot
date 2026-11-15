@@ -92,21 +92,23 @@ class TitanBot extends Client {
       const staffRoleIds = new Set(STAFF_ROLES.map(r => r.id));
 
       this.on('guildMemberUpdate', async (oldMember, newMember) => {
-        const oldRoleIds = Array.from(oldMember.roles.cache.keys());
-        const newRoleIds = Array.from(newMember.roles.cache.keys());
+        const oldRoleIds = oldMember._roles || [];
+        const newRoleIds = newMember._roles || [];
 
         const staffRoleChanged = Array.from(staffRoleIds).some(
           id => oldRoleIds.includes(id) !== newRoleIds.includes(id)
         );
 
         if (staffRoleChanged) {
+          console.log(`[STAFFLIST] Staff role change detected for ${newMember.user.tag}. Updating embed...`);
           await refreshStaffMessage(this, newMember.guild.id);
         }
       });
 
       this.on('guildMemberRemove', async (member) => {
-        const hadStaffRole = member.roles.cache.some(r => staffRoleIds.has(r.id));
+        const hadStaffRole = member._roles?.some(id => staffRoleIds.has(id));
         if (hadStaffRole) {
+          console.log(`[STAFFLIST] Staff member left/kicked: ${member.user.tag}. Updating embed...`);
           await refreshStaffMessage(this, member.guild.id);
         }
       });
