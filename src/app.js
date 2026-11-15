@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Client, Collection, GatewayIntentBits } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
 import { REST } from '@discordjs/rest';
 import express from 'express';
 import cron from 'node-cron';
@@ -33,6 +33,11 @@ class TitanBot extends Client {
         GatewayIntentBits.GuildVoiceStates,          
         GatewayIntentBits.GuildBans,                 
       ],
+      partials: [
+        Partials.GuildMember,
+        Partials.User,
+        Partials.Message,
+      ]
     });
 
     this.config = config;
@@ -92,24 +97,29 @@ class TitanBot extends Client {
       const staffRoleIds = new Set(STAFF_ROLES.map(r => r.id));
 
       this.on('guildMemberUpdate', async (oldMember, newMember) => {
-        const oldRoleIds = oldMember._roles || [];
-        const newRoleIds = newMember._roles || [];
+        try {
+          const fetchedMember = await newMember.guild.members.fetch(newMember.id).catch(() => newMember);
+          const roleIds = fetchedMember._roles || Array.from(fetchedMember.roles.cache.keys());
 
-        const staffRoleChanged = Array.from(staffRoleIds).some(
-          id => oldRoleIds.includes(id) !== newRoleIds.includes(id)
-        );
+          const hasStaffRole = roleIds.some(id => staffRoleIds.has(id));
+          console.log(`[STAFFLIST] Member updated: ${fetchedMember.user.tag} | Has staff role? ${hasStaffRole}`);
 
-        if (staffRoleChanged) {
-          console.log(`[STAFFLIST] Staff role change detected for ${newMember.user.tag}. Updating embed...`);
-          await refreshStaffMessage(this, newMember.guild.id);
+          await refreshStaffMessage(this, fetchedMember.guild.id);
+        } catch (err) {
+          console.error('[STAFFLIST] Error handling guildMemberUpdate:', err.message);
         }
       });
 
       this.on('guildMemberRemove', async (member) => {
-        const hadStaffRole = member._roles?.some(id => staffRoleIds.has(id));
-        if (hadStaffRole) {
-          console.log(`[STAFFLIST] Staff member left/kicked: ${member.user.tag}. Updating embed...`);
-          await refreshStaffMessage(this, member.guild.id);
+        try {
+          const hadStaffRole = member._roles?.some(id => staffRoleIds.has(id)) || member.roles?.cache.some(r => staffRoleIds.has(r.id));
+          console.log(`[STAFFLIST] Member left/kicked: ${member.user?.tag || 'Unknown'} | Had staff role? ${hadStaffRole}`);
+          
+          if (hadStaffRole) {
+            await refreshStaffMessage(this, member.guild.id);
+          }
+        } catch (err) {
+          console.error('[STAFFLIST] Error handling guildMemberRemove:', err.message);
         }
       });
       
