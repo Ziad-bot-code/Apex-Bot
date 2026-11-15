@@ -18,7 +18,7 @@ export const STAFF_ROLES = [
 ];
 
 export async function buildStaffEmbed(guild) {
-    // Force fetch all members from Discord API to avoid stale cache issues
+    // Force fetch all members from Discord API to completely bypass stale cache
     await guild.members.fetch({ force: true });
 
     const embed = new EmbedBuilder()
@@ -59,22 +59,13 @@ export async function refreshStaffMessage(client, guildId) {
 
     try {
         const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId);
-        if (!guild) {
-            console.error(`❌ [STAFFLIST] Guild ${guildId} not found!`);
-            return;
-        }
+        if (!guild) return;
 
         const channel = await guild.channels.fetch(channelId);
-        if (!channel) {
-            console.error(`❌ [STAFFLIST] Channel ${channelId} not found!`);
-            return;
-        }
+        if (!channel) return;
 
         const message = await channel.messages.fetch(messageId);
-        if (!message) {
-            console.error(`❌ [STAFFLIST] Message ${messageId} not found in channel!`);
-            return;
-        }
+        if (!message) return;
 
         const updatedEmbed = await buildStaffEmbed(guild);
         await message.edit({ embeds: [updatedEmbed] });
@@ -95,8 +86,6 @@ export default {
 
         const embed = await buildStaffEmbed(interaction.guild);
         const sentMessage = await interaction.channel.send({ embeds: [embed] });
-
-        console.log(`[STAFFLIST] /stafflist executed. Channel: ${interaction.channel.id} | Message: ${sentMessage.id}`);
 
         await interaction.editReply({
             content: `✅ Live staff list posted!\nAdd these variables in Railway:\n\`STAFF_CHANNEL_ID\` = \`${interaction.channel.id}\`\n\`STAFF_MESSAGE_ID\` = \`${sentMessage.id}\``
