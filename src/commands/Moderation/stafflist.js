@@ -51,6 +51,8 @@ export async function refreshStaffMessage(client, guildId) {
     const channelId = process.env.STAFF_CHANNEL_ID;
     const messageId = process.env.STAFF_MESSAGE_ID;
     
+    console.log(`[STAFFLIST] Refresh requested. Channel ID: ${channelId} | Message ID: ${messageId}`);
+
     if (!channelId || !messageId) {
         console.warn('⚠️ [STAFFLIST] STAFF_CHANNEL_ID or STAFF_MESSAGE_ID variables are missing in Railway!');
         return;
@@ -58,17 +60,26 @@ export async function refreshStaffMessage(client, guildId) {
 
     try {
         const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId);
-        if (!guild) return;
+        if (!guild) {
+            console.error(`❌ [STAFFLIST] Guild ${guildId} not found!`);
+            return;
+        }
 
         const channel = await guild.channels.fetch(channelId);
-        if (!channel) return;
+        if (!channel) {
+            console.error(`❌ [STAFFLIST] Channel ${channelId} not found!`);
+            return;
+        }
 
         const message = await channel.messages.fetch(messageId);
-        if (!message) return;
+        if (!message) {
+            console.error(`❌ [STAFFLIST] Message ${messageId} not found in channel!`);
+            return;
+        }
 
         const updatedEmbed = await buildStaffEmbed(guild);
         await message.edit({ embeds: [updatedEmbed] });
-        console.log('✅ [STAFFLIST] Live staff message successfully updated!');
+        console.log('✅ [STAFFLIST] Live staff message successfully updated on Discord!');
     } catch (err) {
         console.error('❌ [STAFFLIST] Failed to edit live message:', err.message);
     }
@@ -86,8 +97,10 @@ export default {
         const embed = await buildStaffEmbed(interaction.guild);
         const sentMessage = await interaction.channel.send({ embeds: [embed] });
 
+        console.log(`[STAFFLIST] /stafflist executed. Channel: ${interaction.channel.id} | Message: ${sentMessage.id}`);
+
         await interaction.editReply({
-            content: `✅ Live staff list posted!\nTo make this message auto-update permanently, add these two variables in Railway:\n\`STAFF_CHANNEL_ID\` = \`${interaction.channel.id}\`\n\`STAFF_MESSAGE_ID\` = \`${sentMessage.id}\``
+            content: `✅ Live staff list posted!\nAdd these variables in Railway:\n\`STAFF_CHANNEL_ID\` = \`${interaction.channel.id}\`\n\`STAFF_MESSAGE_ID\` = \`${sentMessage.id}\``
         });
     },
 };
