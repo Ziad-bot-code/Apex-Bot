@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
 
-const STAFF_ROLES = [
+export const STAFF_ROLES = [
     { name: '— CEO —', id: '1558870361011920928' },
     { name: '— OWNER —', id: '1507318444989616189' },
     { name: '— DIRECTOR —', id: '1557541299064807464' },
@@ -17,47 +17,77 @@ const STAFF_ROLES = [
     { name: '— JR.HELPER —', id: '1546180624698835079' }
 ];
 
+// Stores the active channel & message IDs in memory (or loads from Railway Variables)
+export let trackedStaffMsg = {
+    channelId: process.env.STAFF_CHANNEL_ID || null,
+    messageId: process.env.STAFF_MESSAGE_ID || null
+};
+
+export async function buildStaffEmbed(guild) {
+    await guild.members.fetch();
+
+    const embed = new EmbedBuilder()
+        .setTitle('✦ EUROPEMC • STAFF TEAM')
+        .setDescription('**OFFICIAL STAFF MEMBERS & ROLES**\n---------------------------------------')
+        .setColor('#3498DB')
+        .setFooter({ text: 'EuropeMC • Live staff roles • Auto-updated' })
+        .setTimestamp();
+
+    for (const roleGroup of STAFF_ROLES) {
+        const role = guild.roles.cache.get(roleGroup.id);
+
+        if (!role) {
+            embed.addFields({ name: roleGroup.name, value: '*Role not found*', inline: false });
+            continue;
+        }
+
+        const membersText = role.members.map(m => `${m}`).join('\n');
+
+        embed.addFields({
+            name: roleGroup.name,
+            value: membersText.length > 0 ? membersText : '*None*',
+            inline: false
+        });
+    }
+
+    return embed;
+}
+
+export async function refreshStaffMessage(guild) {
+    if (!trackedStaffMsg.channelId || !trackedStaffMsg.messageId) return;
+
+    try {
+        const channel = await guild.channels.fetch(trackedStaffMsg.channelId);
+        if (!channel) return;
+
+        const message = await channel.messages.fetch(trackedStaffMsg.messageId);
+        if (!message) return;
+
+        const updatedEmbed = await buildStaffEmbed(guild);
+        await message.edit({ embeds: [updatedEmbed] });
+    } catch (err) {
+        console.error('[STAFFLIST] Failed to edit live message:', err.message);
+    }
+}
+
 export default {
     data: new SlashCommandBuilder()
         .setName('stafflist')
-        .setDescription('Posts the official server staff team hierarchy without showing command usage.')
+        .setDescription('Posts the live staff list message that auto-edits on promotions, demotions, or kicks.')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
 
     async execute(interaction) {
-        // 1. Defer ephemerally so nobody else sees "Ziad used /stafflist"
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const guild = interaction.guild;
-        await guild.members.fetch();
+        const embed = await buildStaffEmbed(interaction.guild);
+        const sentMessage = await interaction.channel.send({ embeds: [embed] });
 
-        const embed = new EmbedBuilder()
-            .setTitle('✦ EUROPEMC • STAFF TEAM')
-            .setDescription('**OFFICIAL STAFF MEMBERS & ROLES**\n---------------------------------------')
-            .setColor('#3498DB')
-            .setFooter({ text: 'EuropeMC • Live staff roles • Checked automatically' })
-            .setTimestamp();
+        // Save the new message ID so live updates edit this exact message
+        trackedStaffMsg.channelId = interaction.channel.id;
+        trackedStaffMsg.messageId = sentMessage.id;
 
-        for (const roleGroup of STAFF_ROLES) {
-            const role = guild.roles.cache.get(roleGroup.id);
-
-            if (!role) {
-                embed.addFields({ name: roleGroup.name, value: '*Role not found*', inline: false });
-                continue;
-            }
-
-            const membersWithRole = role.members.map(member => `${member}`).join('\n');
-
-            embed.addFields({
-                name: roleGroup.name,
-                value: membersWithRole.length > 0 ? membersWithRole : '*None*',
-                inline: false
-            });
-        }
-
-        // 2. Send the embed directly as a normal channel message
-        await interaction.channel.send({ embeds: [embed] });
-
-        // 3. Delete the private interaction acknowledgment so nothing is left behind
-        await interaction.deleteReply();
+        await interaction.editReply({
+            content: `✅ Live staff list posted! To keep it auto-updating even after bot restarts, add these two variables in Railway:\n\`STAFF_CHANNEL_ID\` = \`${interaction.channel.id}\`\n\`STAFF_MESSAGE_ID\` = \`${sentMessage.id}\``
+        });
     },
 };
