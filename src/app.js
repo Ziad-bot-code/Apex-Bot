@@ -92,11 +92,12 @@ class TitanBot extends Client {
       const staffRoleIds = new Set(STAFF_ROLES.map(r => r.id));
 
       this.on('guildMemberUpdate', async (oldMember, newMember) => {
-        const oldRoles = oldMember.roles.cache;
-        const newRoles = newMember.roles.cache;
-        const staffRoleChanged =
-          oldRoles.some(r => staffRoleIds.has(r.id) && !newRoles.has(r.id)) ||
-          newRoles.some(r => staffRoleIds.has(r.id) && !oldRoles.has(r.id));
+        const oldRoleIds = Array.from(oldMember.roles.cache.keys());
+        const newRoleIds = Array.from(newMember.roles.cache.keys());
+
+        const staffRoleChanged = Array.from(staffRoleIds).some(
+          id => oldRoleIds.includes(id) !== newRoleIds.includes(id)
+        );
 
         if (staffRoleChanged) {
           await refreshStaffMessage(this, newMember.guild.id);
