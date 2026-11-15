@@ -50,7 +50,11 @@ export async function buildStaffEmbed(guild) {
 export async function refreshStaffMessage(client, guildId) {
     const channelId = process.env.STAFF_CHANNEL_ID;
     const messageId = process.env.STAFF_MESSAGE_ID;
-    if (!channelId || !messageId) return;
+    
+    if (!channelId || !messageId) {
+        console.warn('⚠️ [STAFFLIST] STAFF_CHANNEL_ID or STAFF_MESSAGE_ID variables are missing in Railway!');
+        return;
+    }
 
     try {
         const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId);
@@ -64,8 +68,9 @@ export async function refreshStaffMessage(client, guildId) {
 
         const updatedEmbed = await buildStaffEmbed(guild);
         await message.edit({ embeds: [updatedEmbed] });
+        console.log('✅ [STAFFLIST] Live staff message successfully updated!');
     } catch (err) {
-        console.error('[STAFFLIST] Failed to edit live message:', err.message);
+        console.error('❌ [STAFFLIST] Failed to edit live message:', err.message);
     }
 }
 
@@ -82,7 +87,7 @@ export default {
         const sentMessage = await interaction.channel.send({ embeds: [embed] });
 
         await interaction.editReply({
-            content: `✅ Live staff list posted!\nTo make this message auto-update permanently even after restarts, add these two variables in Railway:\n\`STAFF_CHANNEL_ID\` = \`${interaction.channel.id}\`\n\`STAFF_MESSAGE_ID\` = \`${sentMessage.id}\``
+            content: `✅ Live staff list posted!\nTo make this message auto-update permanently, add these two variables in Railway:\n\`STAFF_CHANNEL_ID\` = \`${interaction.channel.id}\`\n\`STAFF_MESSAGE_ID\` = \`${sentMessage.id}\``
         });
     },
 };
