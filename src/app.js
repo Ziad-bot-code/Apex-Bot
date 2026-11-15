@@ -98,28 +98,26 @@ class TitanBot extends Client {
 
       this.on('guildMemberUpdate', async (oldMember, newMember) => {
         try {
-          const fetchedMember = await newMember.guild.members.fetch(newMember.id).catch(() => newMember);
-          const roleIds = fetchedMember._roles || Array.from(fetchedMember.roles.cache.keys());
-
-          const hasStaffRole = roleIds.some(id => staffRoleIds.has(id));
-          console.log(`[STAFFLIST] Member updated: ${fetchedMember.user.tag} | Has staff role? ${hasStaffRole}`);
-
-          await refreshStaffMessage(this, fetchedMember.guild.id);
+          console.log(`[STAFFLIST EVENT] guildMemberUpdate fired for: ${newMember.user.tag}`);
+          await refreshStaffMessage(this, newMember.guild.id);
         } catch (err) {
-          console.error('[STAFFLIST] Error handling guildMemberUpdate:', err.message);
+          console.error('[STAFFLIST] Error in guildMemberUpdate:', err.message);
+        }
+      });
+
+      this.on('guildRoleUpdate', async (oldRole, newRole) => {
+        if (staffRoleIds.has(newRole.id)) {
+          console.log(`[STAFFLIST EVENT] guildRoleUpdate fired for staff role: ${newRole.name}`);
+          await refreshStaffMessage(this, newRole.guild.id);
         }
       });
 
       this.on('guildMemberRemove', async (member) => {
         try {
-          const hadStaffRole = member._roles?.some(id => staffRoleIds.has(id)) || member.roles?.cache.some(r => staffRoleIds.has(r.id));
-          console.log(`[STAFFLIST] Member left/kicked: ${member.user?.tag || 'Unknown'} | Had staff role? ${hadStaffRole}`);
-          
-          if (hadStaffRole) {
-            await refreshStaffMessage(this, member.guild.id);
-          }
+          console.log(`[STAFFLIST EVENT] guildMemberRemove fired for: ${member.user?.tag}`);
+          await refreshStaffMessage(this, member.guild.id);
         } catch (err) {
-          console.error('[STAFFLIST] Error handling guildMemberRemove:', err.message);
+          console.error('[STAFFLIST] Error in guildMemberRemove:', err.message);
         }
       });
       
