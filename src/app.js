@@ -18,6 +18,7 @@ import { initializeMusic } from './services/music/riffySetup.js';
 import { shutdownMusic } from './services/music/playerHandler.js';
 import pkg from '../package.json' with { type: 'json' };
 import { EXPECTED_SCHEMA_VERSION, EXPECTED_SCHEMA_LABEL } from './config/database/schemaVersion.js';
+import { STAFF_ROLES, refreshStaffMessage } from './commands/Moderation/stafflist.js';
 
 class TitanBot extends Client {
   constructor() {
@@ -29,7 +30,7 @@ class TitanBot extends Client {
         GatewayIntentBits.GuildMessageReactions,       
         GatewayIntentBits.MessageContent,            
         GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.GuildVoiceStates,            
+        GatewayIntentBits.GuildVoiceStates,          
         GatewayIntentBits.GuildBans,                 
       ],
     });
@@ -86,6 +87,28 @@ class TitanBot extends Client {
       startupLog('Logging into Discord...');
       await this.login(this.config.bot.token);
       startupLog('Discord login successful');
+
+      startupLog('Setting up live staff list listeners...');
+      const staffRoleIds = new Set(STAFF_ROLES.map(r => r.id));
+
+      this.on('guildMemberUpdate', async (oldMember, newMember) => {
+        const oldRoles = oldMember.roles.cache;
+        const newRoles = newMember.roles.cache;
+        const staffRoleChanged =
+          oldRoles.some(r => staffRoleIds.has(r.id) && !newRoles.has(r.id)) ||
+          newRoles.some(r => staffRoleIds.has(r.id) && !oldRoles.has(r.id));
+
+        if (staffRoleChanged) {
+          await refreshStaffMessage(this, newMember.guild.id);
+        }
+      });
+
+      this.on('guildMemberRemove', async (member) => {
+        const hadStaffRole = member.roles.cache.some(r => staffRoleIds.has(r.id));
+        if (hadStaffRole) {
+          await refreshStaffMessage(this, member.guild.id);
+        }
+      });
       
       startupLog('Registering slash commands to server...');
       await this.registerCommands();
