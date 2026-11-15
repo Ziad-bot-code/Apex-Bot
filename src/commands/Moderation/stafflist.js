@@ -17,12 +17,6 @@ export const STAFF_ROLES = [
     { name: '— JR.HELPER —', id: '1546180624698835079' }
 ];
 
-// Stores the active channel & message IDs in memory (or loads from Railway Variables)
-export let trackedStaffMsg = {
-    channelId: process.env.STAFF_CHANNEL_ID || null,
-    messageId: process.env.STAFF_MESSAGE_ID || null
-};
-
 export async function buildStaffEmbed(guild) {
     await guild.members.fetch();
 
@@ -53,14 +47,19 @@ export async function buildStaffEmbed(guild) {
     return embed;
 }
 
-export async function refreshStaffMessage(guild) {
-    if (!trackedStaffMsg.channelId || !trackedStaffMsg.messageId) return;
+export async function refreshStaffMessage(client, guildId) {
+    const channelId = process.env.STAFF_CHANNEL_ID;
+    const messageId = process.env.STAFF_MESSAGE_ID;
+    if (!channelId || !messageId) return;
 
     try {
-        const channel = await guild.channels.fetch(trackedStaffMsg.channelId);
+        const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId);
+        if (!guild) return;
+
+        const channel = await guild.channels.fetch(channelId);
         if (!channel) return;
 
-        const message = await channel.messages.fetch(trackedStaffMsg.messageId);
+        const message = await channel.messages.fetch(messageId);
         if (!message) return;
 
         const updatedEmbed = await buildStaffEmbed(guild);
@@ -82,12 +81,8 @@ export default {
         const embed = await buildStaffEmbed(interaction.guild);
         const sentMessage = await interaction.channel.send({ embeds: [embed] });
 
-        // Save the new message ID so live updates edit this exact message
-        trackedStaffMsg.channelId = interaction.channel.id;
-        trackedStaffMsg.messageId = sentMessage.id;
-
         await interaction.editReply({
-            content: `✅ Live staff list posted! To keep it auto-updating even after bot restarts, add these two variables in Railway:\n\`STAFF_CHANNEL_ID\` = \`${interaction.channel.id}\`\n\`STAFF_MESSAGE_ID\` = \`${sentMessage.id}\``
+            content: `✅ Live staff list posted!\nTo make this message auto-update permanently even after restarts, add these two variables in Railway:\n\`STAFF_CHANNEL_ID\` = \`${interaction.channel.id}\`\n\`STAFF_MESSAGE_ID\` = \`${sentMessage.id}\``
         });
     },
 };
