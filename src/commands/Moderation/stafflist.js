@@ -18,7 +18,8 @@ export const STAFF_ROLES = [
 ];
 
 export async function buildStaffEmbed(guild) {
-    await guild.members.fetch();
+    // Force fetch all members from Discord API to avoid stale cache issues
+    await guild.members.fetch({ force: true });
 
     const embed = new EmbedBuilder()
         .setTitle('✦ EUROPEMC • STAFF TEAM')
@@ -51,8 +52,6 @@ export async function refreshStaffMessage(client, guildId) {
     const channelId = process.env.STAFF_CHANNEL_ID;
     const messageId = process.env.STAFF_MESSAGE_ID;
     
-    console.log(`[STAFFLIST] Refresh requested. Channel ID: ${channelId} | Message ID: ${messageId}`);
-
     if (!channelId || !messageId) {
         console.warn('⚠️ [STAFFLIST] STAFF_CHANNEL_ID or STAFF_MESSAGE_ID variables are missing in Railway!');
         return;
