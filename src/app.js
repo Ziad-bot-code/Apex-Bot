@@ -188,4 +188,116 @@ class TitanBot extends Client {
       }
       
       times.push(now);
-      requestCounts.
+      requestCounts.set(ip, times);
+      next();
+    });
+
+    app.get('/health', (req, res) => {
+      const dbStatus = this.db?.getStatus?.() || { isDegraded: 'unknown' };
+      const status = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        database: {
+          connected: dbStatus.connectionType !== 'none',
+          degraded: dbStatus.isDegraded,
+          type: dbStatus.connectionType
+        }
+      };
+      res.status(200).json(status);
+    });
+
+    app.get('/ready', (req, res) => {
+      const dbStatus = this.db?.getStatus?.() || { isDegraded: true, connectionType: 'none' };
+      const isReady = this.isReady() && !dbStatus.isDegraded;
+
+      const metrics = {
+        guildCount: this.guilds?.cache?.size ?? 0,
+        commandCount: this.commands?.size ?? 0,
+        database: {
+          mode: dbStatus.connectionType,
+          degraded: dbStatus.isDegraded,
+          degradedReason: dbStatus.degradedReason ?? null,
+        },
+        schemaVersion: EXPECTED_SCHEMA_VERSION,
+        schemaLabel: EXPECTED_SCHEMA_LABEL,
+      };
+
+      if (isReady) {
+        return res.status(200).json({
+          ready: true,
+          message: 'Bot is ready',
+          metrics,
+        });
+      }
+
+      res.status(503).json({
+        ready: false,
+        reason: !this.isReady() ? 'Bot not Ready' : 'Database degraded',
+        metrics,
+      });
+    });
+
+    app.get('/', (req, res) => {
+      res.status(200).json({ 
+        message: 'TitanBot System Online',
+        version: pkg.version,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    const startServer = (port, attempt = 0) => {
+      let hasStartedListening = false;
+      const server = app.listen(port, host, () => {
+        hasStartedListening = true;
+        this.webServer = server;
+        startupLog(`✅ Web Server running on ${host}:${port}`);
+        startupLog(`Health endpoint: http://${host}:${port}/health`);
+        startupLog(`Ready endpoint: http://${host}:${port}/ready`);
+      });
+
+      server.on('error', (error) => {
+        const errorCode = error?.code || 'UNKNOWN_ERROR';
+        const errorMessage = error?.message || 'Unknown server error';
+
+        if (!hasStartedListening && errorCode === 'EADDRINUSE' && attempt < maxPortRetryAttempts) {
+          const nextPort = port + 1;
+          startupLog(`Port ${port} is already in use. Trying port ${nextPort}...`);
+          setTimeout(() => startServer(nextPort, attempt + 1), 250);
+          return;
+        }
+
+        if (hasStartedListening && errorCode === 'EADDRINUSE') {
+          logger.warn(`Web server reported a duplicate bind warning on ${host}:${port}, but the bot remains online.`);
+          return;
+        }
+
+        logger.error(`❌ Web server error on port ${port} (${errorCode}): ${errorMessage}`);
+
+        if (!hasStartedListening) {
+          process.exit(1);
+        }
+      });
+    };
+
+    startServer(configuredPort, 0);
+  }
+
+  setupCronJobs() {
+    cron.schedule('0 6 * * *', runSafeTask('birthday_check', () => checkBirthdays(this)));
+    cron.schedule('* * * * *', runSafeTask('giveaway_check', () => checkGiveaways(this)));
+    cron.schedule('* * * * *', runSafeTask('daily_giveaway_check', () => checkDailyGiveaways(this)));
+    cron.schedule('*/5 * * * *', runSafeTask('ticket_autoclose_check', () => checkAutoCloseTickets(this)));
+    cron.schedule('*/15 * * * *', runSafeTask('counter_update', () => this.updateAllCounters()));
+  }
+
+  async updateAllCounters() {
+    if (!this.db) {
+      logger.warn('Database not available for counter updates');
+      return;
+    }
+    
+    for (const [guildId, guild] of this.guilds.cache) {
+      try {
+        const counters = await getServerCounters(this, guildId);
+        const valid
