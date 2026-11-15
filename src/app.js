@@ -98,9 +98,10 @@ class TitanBot extends Client {
       this.on('guildMemberUpdate', async (oldMember, newMember) => {
         try {
           console.log(`[STAFFLIST EVENT] guildMemberUpdate fired for: ${newMember.user.tag}`);
+          // 1.5 second delay ensures Discord API finishes committing the added role
           setTimeout(async () => {
             await refreshStaffMessage(this, newMember.guild.id);
-          }, 1000);
+          }, 1500);
         } catch (err) {
           console.error('[STAFFLIST] Error in guildMemberUpdate:', err.message);
         }
@@ -111,7 +112,7 @@ class TitanBot extends Client {
           console.log(`[STAFFLIST EVENT] guildRoleUpdate fired for staff role: ${newRole.name}`);
           setTimeout(async () => {
             await refreshStaffMessage(this, newRole.guild.id);
-          }, 1000);
+          }, 1500);
         }
       });
 
@@ -120,7 +121,7 @@ class TitanBot extends Client {
           console.log(`[STAFFLIST EVENT] guildMemberRemove fired for: ${member.user?.tag}`);
           setTimeout(async () => {
             await refreshStaffMessage(this, member.guild.id);
-          }, 1000);
+          }, 1500);
         } catch (err) {
           console.error('[STAFFLIST] Error in guildMemberRemove:', err.message);
         }
@@ -425,7 +426,7 @@ class TitanBot extends Client {
 try {
   const bot = new TitanBot();
   
-  const setupShutdown = () => {
+  name setupShutdown = () => {
     process.on('SIGTERM', () => bot.shutdown('SIGTERM'));
     process.on('SIGINT', () => bot.shutdown('SIGINT'));
     
